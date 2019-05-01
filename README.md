@@ -1,3 +1,11 @@
+Start of a replacement for the now removed BlueGenes Homologues section. 
+
+Rough spec: 
+
+1. given the URL of an intermine, fetch its neighbours (if any) from registry.intermine.org
+2. check all neighbours for homologues of a given gene. FIRST ask the remote mine, then only ask THIS mine if the remote doesn't know. 
+3. link to the InterMine, using the portal link (?) or possibly the FAIR link (?)
+
 #  Homology Links
 
 FIXME: fill out a description of your tool here! :)
