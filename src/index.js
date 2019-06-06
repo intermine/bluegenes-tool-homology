@@ -66,29 +66,48 @@ function createPortalUrl(apiUrl, gene) {
   );
 }
 
-function renderHomologues(node, instance, homologueList) {
-  if (!homologueList.length) return null;
+var nsToElem = {};
 
+function renderMine(node, instance) {
   var div = document.createElement("div");
 
   var mine = document.createElement("span");
-  mine.appendChild(document.createTextNode(instance.name));
+  var text = document.createTextNode(instance.name.concat(' ...'));
+  mine.appendChild(text);
   mine.style.color = instance.colors
     && instance.colors.header
     && instance.colors.header.main
     || '#000';
   div.appendChild(mine);
 
-  homologueList.forEach(function(homologue) {
-    var gene = geneToSymbol(homologue);
-
-    var anchor = document.createElement("a");
-    anchor.href = createPortalUrl(instance.url, gene);
-    anchor.appendChild(document.createTextNode(gene));
-    div.appendChild(anchor);
-  })
+  nsToElem[instance.namespace] = mine;
 
   node.appendChild(div);
+}
+
+function renderHomologues(instance, homologueList) {
+  var mine = nsToElem[instance.namespace];
+
+  if (homologueList.length) {
+    // Remove the loading indicator text.
+    mine.innerHTML = "";
+    mine.appendChild(document.createTextNode(instance.name));
+
+    homologueList.forEach(function(homologue) {
+      var gene = geneToSymbol(homologue);
+
+      var anchor = document.createElement("a");
+      anchor.href = createPortalUrl(instance.url, gene);
+      anchor.appendChild(document.createTextNode(gene));
+
+      var div = mine.parentNode;
+      div.appendChild(anchor);
+    })
+  } else {
+    // This InterMine instance has no homologues, so we remove it!
+    var div = mine.parentNode;
+    div.parentNode.removeChild(div);
+  }
 }
 
 function getHomologues(node, symbol, instance) {
@@ -123,8 +142,10 @@ function getHomologues(node, symbol, instance) {
     ]
   };
 
+  renderMine(node, instance);
+
   intermine.records(query).then(function(res) {
-    renderHomologues(node, instance, res);
+    renderHomologues(instance, res);
   });
 }
 
