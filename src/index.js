@@ -8,6 +8,7 @@ function querySymbol(url, id) {
         "symbol",
         "primaryIdentifier",
         "secondaryIdentifier",
+        "organism.name"
       ],
       "orderBy": [
         {
@@ -27,7 +28,8 @@ function querySymbol(url, id) {
 
     intermine.records(query).then(function(res) {
       const symbol = geneToSymbol(res[0]);
-      resolve(symbol);
+      const organism = res[0].organism.name;
+      resolve([symbol, organism]);
     });
   });
 }
@@ -85,8 +87,10 @@ function renderMine(node, instance) {
   node.appendChild(div);
 }
 
-function renderHomologues(instance, homologueList) {
+function renderHomologues(instance, homologueFilter, homologues) {
   var mine = nsToElem[instance.namespace];
+
+  var homologueList = homologues.filter(homologueFilter(instance));
 
   if (homologueList.length) {
     // Remove the loading indicator text.
@@ -94,11 +98,11 @@ function renderHomologues(instance, homologueList) {
     mine.appendChild(document.createTextNode(instance.name));
 
     homologueList.forEach(function(homologue) {
-      var gene = geneToSymbol(homologue);
+      var symbol = geneToSymbol(homologue);
 
       var anchor = document.createElement("a");
-      anchor.href = createPortalUrl(instance.url, gene);
-      anchor.appendChild(document.createTextNode(gene));
+      anchor.href = createPortalUrl(instance.url, symbol);
+      anchor.appendChild(document.createTextNode(symbol));
 
       var div = mine.parentNode;
       div.appendChild(anchor);
@@ -110,7 +114,7 @@ function renderHomologues(instance, homologueList) {
   }
 }
 
-function getHomologues(node, symbol, instance) {
+function getHomologues(node, homologueFilter, symbol, instance) {
   var intermine = new imjs.Service({root: instance.url});
 
   var query = {
@@ -119,11 +123,7 @@ function getHomologues(node, symbol, instance) {
       "secondaryIdentifier",
       "symbol",
       "primaryIdentifier",
-      "organism.name",
-      "homologues.homologue.secondaryIdentifier",
-      "homologues.homologue.symbol",
-      "homologues.homologue.primaryIdentifier",
-      "homologues.homologue.organism.name"
+      "organism.name"
     ],
     "orderBy": [
       {
@@ -145,12 +145,15 @@ function getHomologues(node, symbol, instance) {
   renderMine(node, instance);
 
   intermine.records(query).then(function(res) {
-    renderHomologues(instance, res);
+    renderHomologues(instance, homologueFilter, res);
   });
 }
 
 export function main (el, service, imEntity, state, config) {
-  querySymbol(service.root, imEntity.value).then(function(targetSymbol) {
+  querySymbol(service.root, imEntity.value).then(function(querySymbolRes) {
+    var targetSymbol = querySymbolRes[0];
+    var targetOrganism = querySymbolRes[1];
+
     queryNeighbours(service.root).then(function(neighbours) {
       neighbours.forEach(function(targetNeighbour) {
         fetch("https://registry.intermine.org/service/instances")
@@ -160,8 +163,19 @@ export function main (el, service, imEntity, state, config) {
               return instance.neighbours.includes(targetNeighbour);
             });
 
+            // This function will be used to filter our list of homologues
+            // later on, based on data that we have in scope here.
+            var homologueFilter = function(instance) {
+              // Partially applied so we can compare the InterMine instance.
+              return function(homologue) {
+                // Keep if either in local mine, or from different organism.
+                return instance.url === service.root
+                  || homologue.organism.name !== targetOrganism;
+              }
+            }
+
             instances.forEach(function(instance) {
-              getHomologues(el, targetSymbol, instance);
+              getHomologues(el, homologueFilter, targetSymbol, instance);
             });
           });
       });
