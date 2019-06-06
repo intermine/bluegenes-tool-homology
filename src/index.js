@@ -54,45 +54,6 @@ function queryNeighbours(mineUrl) {
   });
 }
 
-function queryHomologues(symbol, instance) {
-  return new Promise(function(resolve) {
-    var intermine = new imjs.Service({root: instance.url});
-
-    var query = {
-      "from": "Gene",
-      "select": [
-        "secondaryIdentifier",
-        "symbol",
-        "primaryIdentifier",
-        "organism.name",
-        "homologues.homologue.secondaryIdentifier",
-        "homologues.homologue.symbol",
-        "homologues.homologue.primaryIdentifier",
-        "homologues.homologue.organism.name"
-      ],
-      "orderBy": [
-        {
-          "path": "secondaryIdentifier",
-          "direction": "ASC"
-        }
-      ],
-      "where": [
-        {
-          "path": "homologues.homologue",
-          "op": "LOOKUP",
-          "value": symbol,
-          "extraValue": "",
-          "code": "A"
-        }
-      ]
-    };
-
-    intermine.records(query).then(function(res) {
-      resolve([instance, res]);
-    });
-  });
-}
-
 function geneToSymbol(obj) {
   return obj.symbol || obj.primaryIdentifier || obj.secondaryIdentifier;
 }
@@ -105,33 +66,65 @@ function createPortalUrl(apiUrl, gene) {
   );
 }
 
-function renderHomologueLinks(node, results) {
-  results.forEach(function(result) {
-    var instance = result[0];
-    var homologueList = result[1];
+function renderHomologues(node, instance, homologueList) {
+  if (!homologueList.length) return null;
 
-    if (homologueList.length) {
-      var div = document.createElement("div");
+  var div = document.createElement("div");
 
-      var mine = document.createElement("span");
-      mine.appendChild(document.createTextNode(instance.name));
-      mine.style.color = instance.colors
-        && instance.colors.header
-        && instance.colors.header.main
-        || '#000';
-      div.appendChild(mine);
+  var mine = document.createElement("span");
+  mine.appendChild(document.createTextNode(instance.name));
+  mine.style.color = instance.colors
+    && instance.colors.header
+    && instance.colors.header.main
+    || '#000';
+  div.appendChild(mine);
 
-      homologueList.forEach(function(homologue) {
-        var gene = geneToSymbol(homologue);
+  homologueList.forEach(function(homologue) {
+    var gene = geneToSymbol(homologue);
 
-        var anchor = document.createElement("a");
-        anchor.href = createPortalUrl(instance.url, gene);
-        anchor.appendChild(document.createTextNode(gene));
-        div.appendChild(anchor);
-      })
+    var anchor = document.createElement("a");
+    anchor.href = createPortalUrl(instance.url, gene);
+    anchor.appendChild(document.createTextNode(gene));
+    div.appendChild(anchor);
+  })
 
-      node.appendChild(div);
-    }
+  node.appendChild(div);
+}
+
+function getHomologues(node, symbol, instance) {
+  var intermine = new imjs.Service({root: instance.url});
+
+  var query = {
+    "from": "Gene",
+    "select": [
+      "secondaryIdentifier",
+      "symbol",
+      "primaryIdentifier",
+      "organism.name",
+      "homologues.homologue.secondaryIdentifier",
+      "homologues.homologue.symbol",
+      "homologues.homologue.primaryIdentifier",
+      "homologues.homologue.organism.name"
+    ],
+    "orderBy": [
+      {
+        "path": "secondaryIdentifier",
+        "direction": "ASC"
+      }
+    ],
+    "where": [
+      {
+        "path": "homologues.homologue",
+        "op": "LOOKUP",
+        "value": symbol,
+        "extraValue": "",
+        "code": "A"
+      }
+    ]
+  };
+
+  intermine.records(query).then(function(res) {
+    renderHomologues(node, instance, res);
   });
 }
 
@@ -146,12 +139,8 @@ export function main (el, service, imEntity, state, config) {
               return instance.neighbours.includes(targetNeighbour);
             });
 
-            var homologuePromises = instances.map(function(instance) {
-              return queryHomologues(targetSymbol, instance);
-            });
-
-            Promise.all(homologuePromises).then(function(results) {
-              renderHomologueLinks(el, results);
+            instances.forEach(function(instance) {
+              getHomologues(el, targetSymbol, instance);
             });
           });
       });
