@@ -110,23 +110,29 @@ function renderHomologueLinks(node, results) {
     var instance = result[0];
     var homologueList = result[1];
 
-    var div = document.createElement("div");
+    if (homologueList.length) {
+      var div = document.createElement("div");
 
-    var mine = document.createElement("span");
-    mine.appendChild(document.createTextNode(instance.name));
-    div.appendChild(mine);
+      var mine = document.createElement("span");
+      mine.appendChild(document.createTextNode(instance.name));
+      mine.style.color = instance.colors
+        && instance.colors.header
+        && instance.colors.header.main
+        || '#000';
+      div.appendChild(mine);
 
-    homologueList.forEach(function(homologue) {
-      var gene = geneToSymbol(homologue);
+      homologueList.forEach(function(homologue) {
+        var gene = geneToSymbol(homologue);
 
-      var anchor = document.createElement("a");
-      anchor.href = createPortalUrl(instance.url, gene);
-      anchor.appendChild(document.createTextNode(gene));
-      div.appendChild(anchor);
-    })
+        var anchor = document.createElement("a");
+        anchor.href = createPortalUrl(instance.url, gene);
+        anchor.appendChild(document.createTextNode(gene));
+        div.appendChild(anchor);
+      })
 
-    node.appendChild(div);
-  })
+      node.appendChild(div);
+    }
+  });
 }
 
 export function main (el, service, imEntity, state, config) {
