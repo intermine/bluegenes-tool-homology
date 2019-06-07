@@ -162,7 +162,7 @@ function renderHomologues(instance, homologueFilter, homologues) {
         anchorElement({
           href: createPortalUrl(instance.url, symbol),
           text: symbol.concat(" (", homologue.organism.shortName, ")")
-        });
+        })
       );
     })
 
@@ -175,7 +175,7 @@ function renderHomologues(instance, homologueFilter, homologues) {
           className: "homology-show-all",
           href: createPortalUrl(instance.url, symbols),
           text: "Show all ".concat("(", homologueList.length, "+)")
-        });
+        })
       );
     }
   } else {
@@ -249,39 +249,39 @@ export function main (el, service, imEntity, _state, _config) {
     var targetOrganism = querySymbolRes[1];
 
     queryNeighbours(service.root).then(function(neighbours) {
-      neighbours.forEach(function(targetNeighbour) {
-        // Get all mine instances that have the same neighbour.
-        fetch("https://registry.intermine.org/service/instances")
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            var instances = data.instances.filter(function(instance) {
-              return instance.neighbours.includes(targetNeighbour);
-            });
-
-            // This function will be used to filter our list of homologues
-            // later on, based on data that we have in scope here.
-            var homologueFilter = function(instance) {
-              // Partially applied so we can compare the InterMine instance.
-              return function(homologue) {
-                // Keep if either in local mine, or from different organism.
-                return instance.url === service.root
-                  || homologue.organism.name !== targetOrganism;
-              }
-            }
-
-            // Query for homologues and render the data!
-            instances.forEach(function(instance) {
-              renderMine(el, instance, true);
-              getHomologues(targetSymbol, instance)
-                .then(function(res) {
-                  renderHomologues(instance, homologueFilter, res);
-                })
-                .catch(function(_err) {
-                  renderHomologues(instance, homologueFilter, []);
-                });
+      fetch("https://registry.intermine.org/service/instances")
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          // Filter instances to the ones that share at least one neighbour.
+          var instances = data.instances.filter(function(instance) {
+            return neighbours.some(function(neighbour) {
+              return instance.neighbours.includes(neighbour);
             });
           });
-      });
+
+          // This function will be used to filter our list of homologues
+          // later on, based on data that we have in scope here.
+          var homologueFilter = function(instance) {
+            // Partially applied so we can compare the InterMine instance.
+            return function(homologue) {
+              // Keep if either in local mine, or from different organism.
+              return instance.url === service.root
+                || homologue.organism.name !== targetOrganism;
+            }
+          }
+
+          // Query for homologues and render the data!
+          instances.forEach(function(instance) {
+            renderMine(el, instance, true);
+            getHomologues(targetSymbol, instance)
+              .then(function(res) {
+                renderHomologues(instance, homologueFilter, res);
+              })
+              .catch(function(_err) {
+                renderHomologues(instance, homologueFilter, []);
+              });
+          });
+        });
     });
   });
 }
