@@ -124,6 +124,18 @@ function renderMine(node, instance, isLoading) {
   node.appendChild(div);
 }
 
+// Helper to create an anchor element by passing an `attrs` object.
+function anchorElement(attrs) {
+  var anchor = document.createElement("a");
+  anchor.href = attrs.href;
+  anchor.target = "_blank";
+  anchor.appendChild(document.createTextNode(attrs.text));
+
+  if (attrs.className) anchor.className = attrs.className;
+
+  return anchor;
+}
+
 // Render the list of `homologues` belonging to a mine `instance`. They will be
 // mounted as siblings to the mine name, which is added to the DOM by
 // `renderMine`. A function which takes a mine instance object and returns a
@@ -146,26 +158,25 @@ function renderHomologues(instance, homologueFilter, homologues) {
     homologueList.slice(0, SHOW_GENES_COUNT).forEach(function(homologue) {
       var symbol = geneToSymbol(homologue);
 
-      var anchor = document.createElement("a");
-      anchor.href = createPortalUrl(instance.url, symbol);
-      anchor.target = "_blank";
-      var entry = symbol.concat(" (", homologue.organism.shortName, ")");
-      anchor.appendChild(document.createTextNode(entry));
-
-      div.appendChild(anchor);
+      div.appendChild(
+        anchorElement({
+          href: createPortalUrl(instance.url, symbol),
+          text: symbol.concat(" (", homologue.organism.shortName, ")")
+        });
+      );
     })
 
     // Append a "Show all" link if the list has been truncated.
     if (homologueList.length > SHOW_GENES_COUNT) {
-      var showAll = document.createElement("a");
       var symbols = homologueList.map(geneToSymbol);
-      showAll.className = "homology-show-all";
-      showAll.href = createPortalUrl(instance.url, symbols);
-      showAll.target = "_blank";
-      var showAllText = "Show all ".concat("(", homologueList.length, "+)");
-      showAll.appendChild(document.createTextNode(showAllText));
 
-      div.appendChild(showAll);
+      div.appendChild(
+        anchorElement({
+          className: "homology-show-all",
+          href: createPortalUrl(instance.url, symbols),
+          text: "Show all ".concat("(", homologueList.length, "+)")
+        });
+      );
     }
   } else {
     // This InterMine instance has either errored out, or it has no homologues;
