@@ -1,3 +1,5 @@
+var SHOW_GENES_COUNT = 5;
+
 function querySymbol(url, id) {
   return new Promise(function(resolve) {
     var intermine = new imjs.Service({root: url});
@@ -61,10 +63,14 @@ function geneToSymbol(obj) {
 }
 
 function createPortalUrl(apiUrl, gene) {
+  var exid = Array.isArray(gene)
+    ? "&externalids=".concat(gene.join(","))
+    : "&externalid=".concat(gene);
+
   return apiUrl.concat(
     "/portal.do",
     "?class=Gene",
-    "&externalid=".concat(gene)
+    exid
   );
 }
 
@@ -72,14 +78,15 @@ var nsToElem = {};
 
 function renderMine(node, instance) {
   var div = document.createElement("div");
+  div.className = "homology-mine-view";
 
   var mine = document.createElement("span");
-  var text = document.createTextNode(instance.name.concat(' ...'));
+  var text = document.createTextNode(instance.name);
   mine.appendChild(text);
   mine.style.color = instance.colors
     && instance.colors.header
     && instance.colors.header.main
-    || '#000';
+    || "#000";
   div.appendChild(mine);
 
   nsToElem[instance.namespace] = mine;
@@ -88,28 +95,36 @@ function renderMine(node, instance) {
 }
 
 function renderHomologues(instance, homologueFilter, homologues) {
-  var mine = nsToElem[instance.namespace];
+  var div = nsToElem[instance.namespace].parentNode;
 
   var homologueList = homologues.filter(homologueFilter(instance));
 
   if (homologueList.length) {
-    // Remove the loading indicator text.
-    mine.innerHTML = "";
-    mine.appendChild(document.createTextNode(instance.name));
-
-    homologueList.forEach(function(homologue) {
+    homologueList.slice(0, SHOW_GENES_COUNT).forEach(function(homologue) {
       var symbol = geneToSymbol(homologue);
 
       var anchor = document.createElement("a");
       anchor.href = createPortalUrl(instance.url, symbol);
-      anchor.appendChild(document.createTextNode(symbol));
+      anchor.target = "_blank";
+      var entry = symbol.concat(" (", homologue.organism.shortName, ")");
+      anchor.appendChild(document.createTextNode(entry));
 
-      var div = mine.parentNode;
       div.appendChild(anchor);
     })
+
+    if (homologueList.length > SHOW_GENES_COUNT) {
+      var showAll = document.createElement("a");
+      var symbols = homologueList.map(geneToSymbol);
+      showAll.className = "homology-show-all";
+      showAll.href = createPortalUrl(instance.url, symbols);
+      showAll.target = "_blank";
+      var showAllText = "Show all ".concat("(", homologueList.length, "+)");
+      showAll.appendChild(document.createTextNode(showAllText));
+
+      div.appendChild(showAll);
+    }
   } else {
     // This InterMine instance has no homologues, so we remove it!
-    var div = mine.parentNode;
     div.parentNode.removeChild(div);
   }
 }
@@ -123,7 +138,8 @@ function getHomologues(node, homologueFilter, symbol, instance) {
       "secondaryIdentifier",
       "symbol",
       "primaryIdentifier",
-      "organism.name"
+      "organism.name",
+      "organism.shortName"
     ],
     "orderBy": [
       {
