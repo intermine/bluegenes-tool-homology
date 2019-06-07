@@ -1,6 +1,24 @@
+/* Overview of how we find the homologues of a gene:
+ * 1. We only have the internal (to this mine) ID of our gene, so we run a
+ *    query to get the symbol and organism for our gene.
+ * 2. Using the API URL of our mine passed from BlueGenes, we get its namespace
+ *    and use this to identify the mine in a query for mine instances to find
+ *    its neighbours.
+ * 3. For each neighbour, (or rather neighbourhood) we will query each of the
+ *    belonging mine instances for homologues, gradually building up the list
+ *    of results.
+ */
+
+// Constants you can change to customise the behaviour of this tool.
 var SHOW_GENES_COUNT = 5;
 var QUERY_TIMEOUT = 30*1000;
 
+// State we keep track of so we don't need to query the DOM.
+var nsToElem = {};
+var emptyMines = [];
+var noteElem;
+
+// Use the gene ID we get from BlueGenes to get the gene's symbol and organism.
 function querySymbol(url, id) {
   return new Promise(function(resolve) {
     var intermine = new imjs.Service({root: url});
@@ -37,6 +55,7 @@ function querySymbol(url, id) {
   });
 }
 
+// Use our mine's API URL to get its neighbours.
 function queryNeighbours(mineUrl) {
   return new Promise(function(resolve) {
     fetch(
@@ -59,10 +78,14 @@ function queryNeighbours(mineUrl) {
   });
 }
 
+// Convert a gene object to its symbol string, with multiple fallbacks as some
+// properties may be undefined.
 function geneToSymbol(obj) {
   return obj.symbol || obj.primaryIdentifier || obj.secondaryIdentifier;
 }
 
+// Create a portal URL to a different mine for use with our anchor elements.
+// `gene` can be either a single gene symbol, or an array of multiple.
 function createPortalUrl(apiUrl, gene) {
   var exid = Array.isArray(gene)
     ? "&externalids=".concat(gene.join(","))
@@ -75,11 +98,8 @@ function createPortalUrl(apiUrl, gene) {
   );
 }
 
-// State we need to keep track of in DOM.
-var nsToElem = {};
-var emptyMines = [];
-var noteElem;
-
+// Render the name of the mine `instance`, along with a simple loading indicator
+// if `isLoading` is true. The elements will be mounted onto `node`.
 function renderMine(node, instance, isLoading) {
   var div = document.createElement("div");
   div.className = "homology-mine-view";
@@ -104,6 +124,11 @@ function renderMine(node, instance, isLoading) {
   node.appendChild(div);
 }
 
+// Render the list of `homologues` belonging to a mine `instance`. They will be
+// mounted as siblings to the mine name, which is added to the DOM by
+// `renderMine`. A function which takes a mine instance object and returns a
+// predicate function for filtering the list of homologues can be passed as
+// `homologueFilter`.
 function renderHomologues(instance, homologueFilter, homologues) {
   var div = nsToElem[instance.namespace].parentNode;
   var node = div.parentNode;
@@ -111,11 +136,13 @@ function renderHomologues(instance, homologueFilter, homologues) {
   var homologueList = homologues.filter(homologueFilter(instance));
 
   if (homologueList.length) {
+    // Update the mine name element to remove the loading indicator.
     node.removeChild(div);
     renderMine(node, instance, false);
-    // The node div references will have been removed, so we need to update it.
+    // The reference of `div` will have been removed, so we need to update it.
     div = nsToElem[instance.namespace].parentNode;
 
+    // Truncate list of homologues and render these.
     homologueList.slice(0, SHOW_GENES_COUNT).forEach(function(homologue) {
       var symbol = geneToSymbol(homologue);
 
@@ -128,6 +155,7 @@ function renderHomologues(instance, homologueFilter, homologues) {
       div.appendChild(anchor);
     })
 
+    // Append a "Show all" link if the list has been truncated.
     if (homologueList.length > SHOW_GENES_COUNT) {
       var showAll = document.createElement("a");
       var symbols = homologueList.map(geneToSymbol);
@@ -156,7 +184,8 @@ function renderHomologues(instance, homologueFilter, homologues) {
   }
 }
 
-function getHomologues(node, homologueFilter, symbol, instance) {
+// Query a mine `instance` for the homologues of a gene `symbol`.
+function getHomologues(symbol, instance) {
   var intermine = new imjs.Service({root: instance.url});
 
   var path = "homologues.homologue";
@@ -193,30 +222,24 @@ function getHomologues(node, homologueFilter, symbol, instance) {
     ]
   };
 
-  renderMine(node, instance, true);
-
   // Use `Promise.race` so we can do the query with a timeout.
-  Promise.race([
+  return Promise.race([
     intermine.records(query),
     new Promise(function(_resolve, reject) {
       setTimeout(reject, QUERY_TIMEOUT);
     })
   ])
-    .then(function(res) {
-      renderHomologues(instance, homologueFilter, res);
-    })
-    .catch(function(_err) {
-      renderHomologues(instance, homologueFilter, []);
-    });
 }
 
-export function main (el, service, imEntity, state, config) {
+// The main function invoked by BlueGenes.
+export function main (el, service, imEntity, _state, _config) {
   querySymbol(service.root, imEntity.value).then(function(querySymbolRes) {
     var targetSymbol = querySymbolRes[0];
     var targetOrganism = querySymbolRes[1];
 
     queryNeighbours(service.root).then(function(neighbours) {
       neighbours.forEach(function(targetNeighbour) {
+        // Get all mine instances that have the same neighbour.
         fetch("https://registry.intermine.org/service/instances")
           .then(function(res) { return res.json(); })
           .then(function(data) {
@@ -235,8 +258,16 @@ export function main (el, service, imEntity, state, config) {
               }
             }
 
+            // Query for homologues and render the data!
             instances.forEach(function(instance) {
-              getHomologues(el, homologueFilter, targetSymbol, instance);
+              renderMine(el, instance, true);
+              getHomologues(targetSymbol, instance)
+                .then(function(res) {
+                  renderHomologues(instance, homologueFilter, res);
+                })
+                .catch(function(_err) {
+                  renderHomologues(instance, homologueFilter, []);
+                });
             });
           });
       });
