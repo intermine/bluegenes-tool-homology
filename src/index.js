@@ -1,4 +1,5 @@
 var SHOW_GENES_COUNT = 5;
+var QUERY_TIMEOUT = 30*1000;
 
 function querySymbol(url, id) {
   return new Promise(function(resolve) {
@@ -74,7 +75,10 @@ function createPortalUrl(apiUrl, gene) {
   );
 }
 
+// State we need to keep track of in DOM.
 var nsToElem = {};
+var emptyMines = [];
+var noteElem;
 
 function renderMine(node, instance, isLoading) {
   var div = document.createElement("div");
@@ -102,11 +106,11 @@ function renderMine(node, instance, isLoading) {
 
 function renderHomologues(instance, homologueFilter, homologues) {
   var div = nsToElem[instance.namespace].parentNode;
+  var node = div.parentNode;
 
   var homologueList = homologues.filter(homologueFilter(instance));
 
   if (homologueList.length) {
-    var node = div.parentNode;
     node.removeChild(div);
     renderMine(node, instance, false);
     // The node div references will have been removed, so we need to update it.
@@ -136,8 +140,19 @@ function renderHomologues(instance, homologueFilter, homologues) {
       div.appendChild(showAll);
     }
   } else {
-    // This InterMine instance has no homologues, so we remove it!
-    div.parentNode.removeChild(div);
+    // This InterMine instance has either errored out, or it has no homologues;
+    // in both cases we'll move it to the list of mines without homologues.
+    node.removeChild(div);
+
+    emptyMines.push(instance.name);
+
+    if (noteElem) node.parentNode.removeChild(noteElem);
+
+    noteElem = document.createElement("i");
+    var noteText = "No homologues available for: "
+      .concat(emptyMines.join(", "));
+    noteElem.appendChild(document.createTextNode(noteText));
+    node.parentNode.appendChild(noteElem);
   }
 }
 
@@ -180,9 +195,19 @@ function getHomologues(node, homologueFilter, symbol, instance) {
 
   renderMine(node, instance, true);
 
-  intermine.records(query).then(function(res) {
-    renderHomologues(instance, homologueFilter, res);
-  });
+  // Use `Promise.race` so we can do the query with a timeout.
+  Promise.race([
+    intermine.records(query),
+    new Promise(function(_resolve, reject) {
+      setTimeout(reject, QUERY_TIMEOUT);
+    })
+  ])
+    .then(function(res) {
+      renderHomologues(instance, homologueFilter, res);
+    })
+    .catch(function(_err) {
+      renderHomologues(instance, homologueFilter, []);
+    });
 }
 
 export function main (el, service, imEntity, state, config) {
