@@ -144,6 +144,14 @@ function renderHomologues(instance, homologueFilter, homologues) {
 function getHomologues(node, homologueFilter, symbol, instance) {
   var intermine = new imjs.Service({root: instance.url});
 
+  var path = "homologues.homologue";
+
+  if (instance.namespace === "phytomine") {
+    // PhytoMine uses the American spelling for homolog.
+    // (They also use a different path.)
+    path = "homolog.gene";
+  }
+
   var query = {
     "from": "Gene",
     "select": [
@@ -161,7 +169,7 @@ function getHomologues(node, homologueFilter, symbol, instance) {
     ],
     "where": [
       {
-        "path": "homologues.homologue",
+        "path": path,
         "op": "LOOKUP",
         "value": symbol,
         "extraValue": "",
