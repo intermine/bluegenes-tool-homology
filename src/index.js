@@ -76,7 +76,7 @@ function createPortalUrl(apiUrl, gene) {
 
 var nsToElem = {};
 
-function renderMine(node, instance) {
+function renderMine(node, instance, isLoading) {
   var div = document.createElement("div");
   div.className = "homology-mine-view";
 
@@ -89,6 +89,12 @@ function renderMine(node, instance) {
     || "#000";
   div.appendChild(mine);
 
+  if (isLoading) {
+    var loading = document.createElement("i");
+    loading.appendChild(document.createTextNode("Loading..."));
+    div.appendChild(loading);
+  }
+
   nsToElem[instance.namespace] = mine;
 
   node.appendChild(div);
@@ -100,6 +106,12 @@ function renderHomologues(instance, homologueFilter, homologues) {
   var homologueList = homologues.filter(homologueFilter(instance));
 
   if (homologueList.length) {
+    var node = div.parentNode;
+    node.removeChild(div);
+    renderMine(node, instance, false);
+    // The node div references will have been removed, so we need to update it.
+    div = nsToElem[instance.namespace].parentNode;
+
     homologueList.slice(0, SHOW_GENES_COUNT).forEach(function(homologue) {
       var symbol = geneToSymbol(homologue);
 
@@ -158,7 +170,7 @@ function getHomologues(node, homologueFilter, symbol, instance) {
     ]
   };
 
-  renderMine(node, instance);
+  renderMine(node, instance, true);
 
   intermine.records(query).then(function(res) {
     renderHomologues(instance, homologueFilter, res);
