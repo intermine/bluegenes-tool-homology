@@ -9,6 +9,9 @@
  *    of results.
  */
 
+// Base URL for the InterMine Registry API endpoints.
+var REGISTRY_BASE_URL = "https://registry.intermine.org/service/";
+
 // Constants you can change to customise the behaviour of this tool.
 var SHOW_GENES_COUNT = 5;
 var QUERY_TIMEOUT = 30*1000;
@@ -59,12 +62,12 @@ function querySymbol(url, id) {
 function queryNeighbours(mineUrl) {
   return new Promise(function(resolve) {
     fetch(
-      "http://registry.intermine.org/service/namespace?url="
-        .concat(encodeURIComponent(mineUrl))
+      REGISTRY_BASE_URL
+        .concat("namespace?url=", encodeURIComponent(mineUrl))
     )
       .then(function(res) { return res.json(); })
       .then(function(nsData) {
-        fetch("https://registry.intermine.org/service/instances")
+        fetch(REGISTRY_BASE_URL.concat("instances"))
           .then(function(res) { return res.json(); })
           .then(function(instancesData) {
             resolve(
@@ -249,7 +252,7 @@ export function main (el, service, imEntity, _state, _config) {
     var targetOrganism = querySymbolRes[1];
 
     queryNeighbours(service.root).then(function(neighbours) {
-      fetch("https://registry.intermine.org/service/instances")
+      fetch(REGISTRY_BASE_URL.concat("instances"))
         .then(function(res) { return res.json(); })
         .then(function(data) {
           // Filter instances to the ones that share at least one neighbour.
