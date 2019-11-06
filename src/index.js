@@ -177,7 +177,7 @@ function renderHomologues(instance, homologueFilter, homologues) {
         anchorElement({
           className: "homology-show-all",
           href: createPortalUrl(instance.url, symbols),
-          text: "Show all ".concat("(", homologueList.length, "+)")
+          text: "Open in ".concat(instance.name, " (", homologueList.length, "+)")
         })
       );
     }
