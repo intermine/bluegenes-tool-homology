@@ -3,9 +3,30 @@
   // nested under the tool name prevents your styles from
   // leaking out and affecting other elements by accident.
 
-  // If you want to learn more about LESS, visit lesscss.org.
+  > div {
+    display: flex;
+    flex-wrap: wrap;
+  }
 
-  //to build your css, run `lessc src/style.css dist/style.css --clean-css`
-  // in your terminal
+  .homology-mine-view {
+    display: flex;
+    flex-direction: column;
+    word-break: break-all;
+    margin: 8px 3px;
+  }
+  span {
+    padding: 0 5px;
+    font-weight: bold;
+    text-shadow: 1px 1px 1px black;
+  }
+  i {
+    padding: 0 5px;
+  }
+  a {
+    padding: 0 5px;
+  }
 
+  .homology-show-all {
+    font-style: oblique;
+  }
 }
